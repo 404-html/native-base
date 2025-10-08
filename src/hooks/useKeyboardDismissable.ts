@@ -48,12 +48,26 @@ export function useBackHandler({ enabled, callback }: IParams) {
       callback();
       return true;
     };
+    // BackHandler.addEventListener returns a subscription with .remove() in newer RN versions.
+    // Older RN exposes BackHandler.removeEventListener. Support both.
+    let subscription: { remove?: () => void } | undefined;
+
     if (enabled) {
-      BackHandler.addEventListener('hardwareBackPress', backHandler);
-    } else {
-      BackHandler.removeEventListener('hardwareBackPress', backHandler);
+      try {
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore - some RN types may mark addEventListener differently across versions
+        subscription = BackHandler.addEventListener('hardwareBackPress', backHandler);
+      } catch (e) {
+        subscription = undefined;
+      }
     }
-    return () =>
-      BackHandler.removeEventListener('hardwareBackPress', backHandler);
+
+    return () => {
+      if (subscription && typeof subscription.remove === 'function') {
+        subscription.remove();
+      } else if ((BackHandler as any).removeEventListener) {
+        (BackHandler as any).removeEventListener('hardwareBackPress', backHandler);
+      }
+    };
   }, [enabled, callback]);
 }
